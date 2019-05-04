@@ -48,3 +48,4 @@
 # Crashlytics plugin (for Android Studio and IntelliJ)
 *.iml
 .idea
+build
