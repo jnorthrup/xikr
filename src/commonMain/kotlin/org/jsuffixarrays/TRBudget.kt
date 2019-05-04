@@ -1,6 +1,6 @@
 package org.jsuffixarrays
-class TRBudget(var chance: Int, var remain: Int) {
-    var incval: Int = 0
+class TRBudget(private var chance: Int, private var remain: Int) {
+    private var incval: Int = 0
     var count: Int = 0
 
     init {

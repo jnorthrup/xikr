@@ -1,6 +1,7 @@
 package org.jsuffixarrays
 
 import org.jsuffixarrays.StackElement.Companion.SENIL
+import kotlin.math.min
 
 /**
  *
@@ -22,12 +23,12 @@ import org.jsuffixarrays.StackElement.Companion.SENIL
 class DivSufSort : ISuffixArrayBuilder {
 
     /* fields */
-    var ALPHABET_SIZE: Int
-    var BUCKET_A_SIZE: Int
-    var BUCKET_B_SIZE: Int
-    lateinit var SA: IntArray
-    lateinit var T: IntArray
-    var start: Int = 0
+    private var ALPHABET_SIZE: Int
+    private var BUCKET_A_SIZE: Int
+    private var BUCKET_B_SIZE: Int
+    private lateinit var SA: IntArray
+    private lateinit var T: IntArray
+    private var start: Int = 0
 
     constructor() {
         ALPHABET_SIZE = DEFAULT_ALPHABET_SIZE
@@ -58,20 +59,20 @@ class DivSufSort : ISuffixArrayBuilder {
      *
      */
     override fun buildSuffixArray(input: IntArray, start: Int, length: Int): IntArray {
-        assert(input != null, { "input must not be null" })
-        assert(length >= 2, { "input length must be >= 2" })
-        var mm = minmax(input, start, length)
-        assert(mm.min >= 0, { "input must not be negative" })
-        assert(mm.max < ALPHABET_SIZE, { "max alphabet size is $ALPHABET_SIZE" })
+        assert(input != null) { "input must not be null" }
+        assert(length >= 2) { "input length must be >= 2" }
+        val (mmmin, mmmax) = minmax(input, start, length)
+        assert(mmmin >= 0) { "input must not be negative" }
+        assert(mmmax < ALPHABET_SIZE) { "max alphabet size is $ALPHABET_SIZE" }
 
-        var ret = IntArray(length)
+        val ret = IntArray(length)
         this.SA = ret
         this.T = input
-        var bucket_A = IntArray(BUCKET_A_SIZE)
-        var bucket_B = IntArray(BUCKET_B_SIZE)
+        val bucket_A = IntArray(BUCKET_A_SIZE)
+        val bucket_B = IntArray(BUCKET_B_SIZE)
         this.start = start
         /* Suffixsort. */
-        var m = sortTypeBstar(bucket_A, bucket_B, length)
+        val m = sortTypeBstar(bucket_A, bucket_B, length)
         constructSuffixArray(bucket_A, bucket_B, length, m)
         return ret
     }
@@ -80,18 +81,16 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Constructs the suffix array by using the sorted order of type B* suffixes.
      */
-    fun constructSuffixArray(bucket_A: IntArray, bucket_B: IntArray, n: Int, m: Int) {
+    private fun constructSuffixArray(bucket_A: IntArray, bucket_B: IntArray, n: Int, m: Int) {
         var i: Int
         var j: Int
-        var k: Int // ptr
+        var k: Int
         var s: Int
         var c0: Int
         var c1: Int
         var c2: Int
-        // (_c1)])
         if (0 < m) {
-            /*
-                        * Construct the sorted order of type B suffixes by using the sorted order of
+            /* Construct the sorted order of type B suffixes by using the sorted order of
                         * type B suffixes.
                         */
             c1 = ALPHABET_SIZE - 2
@@ -103,11 +102,7 @@ class DivSufSort : ISuffixArrayBuilder {
                 c2 = -1
                 while (i <= j) {
                     if (0 < (SA[j].also { s = it })) {
-                        // Tools.assert(T[s] == c1, "");
-                        // Tools.assert(((s + 1) < n) && (T[s] <= T[s +
-                        // 1]),
-                        // "");
-                        // Tools.assert(T[s - 1] <= T[s], "");
+
                         SA[j] = s.inv()
                         c0 = T[start + --s]
                         if (0 < s && T[start + s - 1] > c0) {
@@ -119,11 +114,10 @@ class DivSufSort : ISuffixArrayBuilder {
                             }
                             k = bucket_B[c1 * ALPHABET_SIZE + (c0.also { c2 = it })]
                         }
-                        // Tools.assert(k < j, "");
+
                         SA[k--] = s
                     } else {
-                        // Tools.assert(((s == 0) && (T[s] == c1))
-                        // || (s < 0), "");
+
                         SA[j] = s.inv()
                     }
                     --j
@@ -164,17 +158,17 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun sortTypeBstar(bucket_A: IntArray, bucket_B: IntArray, n: Int): Int {
-        var PAb: Int
-        var ISAb: Int
-        var buf: Int
+    private fun sortTypeBstar(bucket_A: IntArray, bucket_B: IntArray, n: Int): Int {
+        val PAb: Int
+        val ISAb: Int
+        val buf: Int
 
         var i: Int
         var j: Int
         var k: Int
         var t: Int
-        var m: Int
-        var bufsize: Int
+        var m: Int = n
+        val bufsize: Int
         var c0: Int
         var c1 = 0
 
@@ -184,7 +178,6 @@ class DivSufSort : ISuffixArrayBuilder {
                 * suffixes into the array SA.
                 */
         i = n - 1
-        m = n
         c0 = T[start + n - 1]
         while (0 <= i) {
             /* type A suffix. */
@@ -346,14 +339,14 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun ssSort(PA: Int, first: Int, last: Int, buf: Int, bufsize: Int,
-               depth: Int, n: Int, lastsuffix: Boolean) {
+    private fun ssSort(PA: Int, first: Int, last: Int, buf: Int, bufsize: Int,
+                       depth: Int, n: Int, lastsuffix: Boolean) {
         var first = first
         var buf = buf
         var bufsize = bufsize
         var a: Int
         var b: Int
-        var middle: Int
+        val middle: Int
         var curbuf: Int// SA pointer
 
         var j: Int
@@ -417,8 +410,8 @@ class DivSufSort : ISuffixArrayBuilder {
         }
 
         if (lastsuffix) {
-            var p1 = SA[PA + SA[first - 1]]
-            var p11 = n - 2
+            val p1 = SA[PA + SA[first - 1]]
+            val p11 = n - 2
             a = first
             i = SA[first - 1]
             while (a < last && (SA[a] < 0 || 0 < ssCompare(p1, p11, PA + SA[a], depth))) {
@@ -434,16 +427,12 @@ class DivSufSort : ISuffixArrayBuilder {
      * special version of ss_compare for handling
      * `ss_compare(T, &(PAi[0]), PA + *a, depth)` situation.
      */
-    fun ssCompare(pa: Int, pb: Int, p2: Int, depth: Int): Int {
-        var U1: Int
-        var U2: Int
-        var U1n: Int
-        var U2n: Int// pointers to T
+    private fun ssCompare(pa: Int, pb: Int, p2: Int, depth: Int): Int {
+        var U1: Int = depth + pa
+        var U2: Int = depth + SA[p2]
+        val U1n: Int = pb + 2
+        val U2n: Int = SA[p2 + 1] + 2// pointers to T
 
-        U1 = depth + pa
-        U2 = depth + SA[p2]
-        U1n = pb + 2
-        U2n = SA[p2 + 1] + 2
         while (U1 < U1n
                 && U2 < U2n && T[start + U1] == T[start + U2]) {
             ++U1
@@ -462,16 +451,12 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun ssCompare(p1: Int, p2: Int, depth: Int): Int {
-        var U1: Int
-        var U2: Int
-        var U1n: Int
-        var U2n: Int// pointers to T
+    private fun ssCompare(p1: Int, p2: Int, depth: Int): Int {
+        var U1: Int = depth + SA[p1]
+        var U2: Int = depth + SA[p2]
+        val U1n: Int = SA[p1 + 1] + 2
+        val U2n: Int = SA[p2 + 1] + 2// pointers to T
 
-        U1 = depth + SA[p1]
-        U2 = depth + SA[p2]
-        U1n = SA[p1 + 1] + 2
-        U2n = SA[p2 + 1] + 2
         while (((U1 < U1n)
                         && (U2 < U2n) && (T[start + U1] == T[start + U2]))) {
             ++U1
@@ -491,7 +476,7 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun ssInplaceMerge(PA: Int, first: Int, middle: Int, last: Int, depth: Int) {
+    private fun ssInplaceMerge(PA: Int, first: Int, middle: Int, last: Int, depth: Int) {
         var middle = middle
         var last = last
         // PA, middle, first, last are pointers to SA
@@ -555,7 +540,7 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun ssRotate(first: Int, middle: Int, last: Int) {
+    private fun ssRotate(first: Int, middle: Int, last: Int) {
         var first = first
         var last = last
         // first, middle, last are pointers in SA
@@ -614,7 +599,7 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun ssBlockSwap(a: Int, b: Int, n: Int) {
+    private fun ssBlockSwap(a: Int, b: Int, n: Int) {
         var a = a
         var b = b
         var n = n
@@ -633,15 +618,15 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * D&C based merge.
      */
-    fun ssSwapMerge(PA: Int, first: Int, middle: Int, last: Int, buf: Int,
-                    bufsize: Int, depth: Int) {
+    private fun ssSwapMerge(PA: Int, first: Int, middle: Int, last: Int, buf: Int,
+                            bufsize: Int, depth: Int) {
         var first = first
         var middle = middle
         var last = last
         // Pa, first, middle, last and buf - pointers in SA array
 
-        var STACK_SIZE = SS_SMERGE_STACKSIZE
-        var stack = Array<StackElement>(STACK_SIZE) { SENIL }
+        val STACK_SIZE = SS_SMERGE_STACKSIZE
+        val stack = Array(STACK_SIZE) { SENIL }
         var l: Int
         var r: Int
         var lm: Int
@@ -649,12 +634,11 @@ class DivSufSort : ISuffixArrayBuilder {
         var m: Int
         var len: Int
         var half: Int
-        var ssize: Int
+        var ssize: Int = 0
         var check: Int
         var next: Int
 
         check = 0
-        ssize = 0
         while (true) {
 
             if ((last - middle) <= bufsize) {
@@ -669,7 +653,7 @@ class DivSufSort : ISuffixArrayBuilder {
                 }
 
                 if (ssize > 0) {
-                    var se = stack[--ssize]
+                    val se = stack[--ssize]
                     first = se.a
                     middle = se.b
                     last = se.c
@@ -692,7 +676,7 @@ class DivSufSort : ISuffixArrayBuilder {
                 }
 
                 if (ssize > 0) {
-                    var se = stack[--ssize]
+                    val se = stack[--ssize]
                     first = se.a
                     middle = se.b
                     last = se.c
@@ -769,7 +753,7 @@ class DivSufSort : ISuffixArrayBuilder {
                 }
 
                 if (ssize > 0) {
-                    var se = stack[--ssize]
+                    val se = stack[--ssize]
                     first = se.a
                     middle = se.b
                     last = se.c
@@ -787,22 +771,19 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Merge-forward with public buffer.
      */
-    fun ssMergeForward(PA: Int, first: Int, middle: Int, last: Int, buf: Int,
-                       depth: Int) {
+    private fun ssMergeForward(PA: Int, first: Int, middle: Int, last: Int, buf: Int,
+                               depth: Int) {
         // PA, first, middle, last, buf are pointers to SA
         var a: Int
-        var b: Int
-        var c: Int
-        var bufend: Int// pointers to SA
-        var t: Int
+        var b: Int = buf
+        var c: Int = middle
+        val bufend: Int = buf + (middle - first) - 1// pointers to SA
+        val t: Int
         var r: Int
 
-        bufend = buf + (middle - first) - 1
         ssBlockSwap(buf, first, middle - first)
 
         t = SA[first.also { a = it }]
-        b = buf
-        c = middle
         while (true) {
             r = ssCompare(PA + SA[b], PA + SA[c], depth)
             if (r < 0) {
@@ -860,20 +841,19 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Merge-backward with public buffer.
      */
-    fun ssMergeBackward(PA: Int, first: Int, middle: Int, last: Int, buf: Int,
-                        depth: Int) {
+    private fun ssMergeBackward(PA: Int, first: Int, middle: Int, last: Int, buf: Int,
+                                depth: Int) {
         // PA, first, middle, last, buf are pointers in SA
         var p1: Int
         var p2: Int// pointers in SA
         var a: Int
         var b: Int
-        var c: Int
-        var bufend: Int// pointers in SA
-        var t: Int
+        var c: Int = middle - 1
+        val bufend: Int = buf + (last - middle) - 1// pointers in SA
+        val t: Int
         var r: Int
         var x: Int
 
-        bufend = buf + (last - middle) - 1
         ssBlockSwap(buf, middle, last - middle)
 
         x = 0
@@ -891,7 +871,6 @@ class DivSufSort : ISuffixArrayBuilder {
         }
         t = SA[last - 1].also { a = it }
         b = bufend
-        c = middle - 1
         while (true) {
             r = ssCompare(p1, p2, depth)
             if (0 < r) {
@@ -990,14 +969,13 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Insertionsort for small size groups
      */
-    fun ssInsertionSort(PA: Int, first: Int, last: Int, depth: Int) {
+    private fun ssInsertionSort(PA: Int, first: Int, last: Int, depth: Int) {
         // PA, first, last are pointers in SA
-        var i: Int
+        var i: Int = last - 2
         var j: Int// pointers in SA
         var t: Int
         var r: Int
 
-        i = last - 2
         while (first <= i) {
             t = SA[i]
             j = i + 1
@@ -1019,11 +997,11 @@ class DivSufSort : ISuffixArrayBuilder {
     }
 
     /* Multikey introsort for medium size groups. */
-    fun ssMintroSort(PA: Int, first: Int, last: Int, depth: Int) {
+    private fun ssMintroSort(PA: Int, first: Int, last: Int, depth: Int) {
         var first = first
         var last = last
         var depth = depth
-        var STACK_SIZE = SS_MISORT_STACKSIZE
+        val STACK_SIZE = SS_MISORT_STACKSIZE
         var Td: Int// T ptr
         var a: Int
         var b: Int
@@ -1033,13 +1011,12 @@ class DivSufSort : ISuffixArrayBuilder {
         var f: Int// SA ptr
         var s: Int
         var t: Int
-        var ssize: Int
+        var ssize: Int = 0
         var limit: Int
         var v: Int
         var x = 0
-        ssize = 0
         limit = ssIlg(last - first)
-        var stack = Array(STACK_SIZE) { SENIL }
+        val stack = Array(STACK_SIZE) { SENIL }
 
         while (true) {
 
@@ -1048,7 +1025,7 @@ class DivSufSort : ISuffixArrayBuilder {
                     ssInsertionSort(PA, first, last, depth)
                 }
                 if (ssize > 0) {
-                    var se: StackElement = stack[--ssize]
+                    val se: StackElement = stack[--ssize]
                     first = se.a
                     last = se.b
                     depth = se.c
@@ -1109,7 +1086,7 @@ class DivSufSort : ISuffixArrayBuilder {
             // choose pivot
             a = ssPivot(Td, PA, first, last)
             v = T[start + Td + SA[PA + SA[a]]]
-            swapInSA(first, a)
+            SA.swap(first to a)
 
             // partition
             b = first
@@ -1118,7 +1095,7 @@ class DivSufSort : ISuffixArrayBuilder {
             if (((b.also { a = it }) < last) && (x < v)) {
                 while ((++b < last) && ((T[start + Td + SA[PA + SA[b]]].also { x = it }) <= v)) {
                     if (x == v) {
-                        swapInSA(b, a)
+                        SA.swap(b to a)
                         ++a
                     }
                 }
@@ -1130,23 +1107,23 @@ class DivSufSort : ISuffixArrayBuilder {
             if ((b < (c.also { d = it })) && (x > v)) {
                 while ((b < --c) && ((T[start + Td + SA[PA + SA[c]]].also { x = it }) >= v)) {
                     if (x == v) {
-                        swapInSA(c, d)
+                        SA.swap(c to d)
                         --d
                     }
                 }
             }
 
             while (b < c) {
-                swapInSA(b, c)
+                SA.swap(b to c)
                 while ((++b < c) && ((T[start + Td + SA[PA + SA[b]]].also { x = it }) <= v)) {
                     if (x == v) {
-                        swapInSA(b, a)
+                        SA.swap(b to a)
                         ++a
                     }
                 }
                 while ((b < --c) && ((T[start + Td + SA[PA + SA[c]]].also { x = it }) >= v)) {
                     if (x == v) {
-                        swapInSA(c, d)
+                        SA.swap(c to d)
                         --d
                     }
                 }
@@ -1161,7 +1138,7 @@ class DivSufSort : ISuffixArrayBuilder {
                 e = first
                 f = b - s
                 while (0 < s) {
-                    swapInSA(e, f)
+                    SA.swap(e to f)
                     --s
                     ++e
                     ++f
@@ -1172,7 +1149,7 @@ class DivSufSort : ISuffixArrayBuilder {
                 e = b
                 f = last - s
                 while (0 < s) {
-                    swapInSA(e, f)
+                    SA.swap(e to f)
                     --s
                     ++e
                     ++f
@@ -1238,7 +1215,7 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Returns the pivot element.
      */
-    fun ssPivot(Td: Int, PA: Int, first: Int, last: Int): Int {
+    private fun ssPivot(Td: Int, PA: Int, first: Int, last: Int): Int {
         var first = first
         var last = last
         var middle: Int// SA pointer
@@ -1246,11 +1223,11 @@ class DivSufSort : ISuffixArrayBuilder {
         middle = first + t / 2
 
         if (t <= 512) {
-            if (t <= 32) {
-                return ssMedian3(Td, PA, first, middle, last - 1)
+            return if (t <= 32) {
+                ssMedian3(Td, PA, first, middle, last - 1)
             } else {
                 t = t shr 2
-                return ssMedian5(Td, PA, first, first + t, middle, last - 1 - t, last - 1)
+                ssMedian5(Td, PA, first, first + t, middle, last - 1 - t, last - 1)
             }
         }
         t = t shr 3
@@ -1263,7 +1240,7 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Returns the median of five elements
      */
-    fun ssMedian5(Td: Int, PA: Int, v1: Int, v2: Int, v3: Int, v4: Int, v5: Int): Int {
+    private fun ssMedian5(Td: Int, PA: Int, v1: Int, v2: Int, v3: Int, v4: Int, v5: Int): Int {
         var v1 = v1
         var v2 = v2
         var v3 = v3
@@ -1310,11 +1287,11 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Returns the median of three elements.
      */
-    fun ssMedian3(Td: Int, PA: Int, v1: Int, v2: Int, v3: Int): Int {
+    private fun ssMedian3(Td: Int, PA: Int, v1: Int, v2: Int, v3: Int): Int {
         var v1 = v1
         var v2 = v2
         if (T[start + Td + SA[PA + SA[v1]]] > T[start + Td + SA[PA + SA[v2]]]) {
-            var t = v1
+            val t = v1
             v1 = v2
             v2 = t
         }
@@ -1331,12 +1308,10 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Binary partition for substrings.
      */
-    fun ssPartition(PA: Int, first: Int, last: Int, depth: Int): Int {
-        var a: Int
-        var b: Int// SA pointer
+    private fun ssPartition(PA: Int, first: Int, last: Int, depth: Int): Int {
+        var a: Int = first - 1
+        var b: Int = last// SA pointer
         var t: Int
-        a = first - 1
-        b = last
         while (true) {
             while ((++a < b) && ((SA[PA + SA[a]] + depth) >= (SA[PA + SA[a] + 1] + 1))) {
                 SA[a] = SA[a].inv()
@@ -1359,17 +1334,16 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Simple top-down heapsort.
      */
-    fun ssHeapSort(Td: Int, PA: Int, sa: Int, size: Int) {
+    private fun ssHeapSort(Td: Int, PA: Int, sa: Int, size: Int) {
         var i: Int
-        var m: Int
+        var m: Int = size
         var t: Int
 
-        m = size
         if ((size % 2) == 0) {
             m--
             if ((T[start + Td + SA[PA + SA[sa + (m / 2)]]] < T[(start + Td
                             + SA[PA + SA[sa + m]])])) {
-                swapInSA(sa + m, sa + (m / 2))
+                SA.swap(sa + m to sa + (m / 2))
             }
         }
 
@@ -1379,7 +1353,7 @@ class DivSufSort : ISuffixArrayBuilder {
             --i
         }
         if ((size % 2) == 0) {
-            swapInSA(sa, sa + m)
+            SA.swap(sa to sa + m)
             ssFixDown(Td, PA, sa, 0, m)
         }
         i = m - 1
@@ -1396,12 +1370,12 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun ssFixDown(Td: Int, PA: Int, sa: Int, i: Int, size: Int) {
+    private fun ssFixDown(Td: Int, PA: Int, sa: Int, i: Int, size: Int) {
         var i = i
         var j: Int
         var k: Int
-        var v: Int
-        var c: Int
+        val v: Int
+        val c: Int
         var d: Int
         var e: Int
 
@@ -1424,26 +1398,16 @@ class DivSufSort : ISuffixArrayBuilder {
     }
 
     /**
-     *
-     */
-    fun swapInSA(a: Int, b: Int) {
-        var tmp = SA[a]
-        SA[a] = SA[b]
-        SA[b] = tmp
-    }
-
-    /**
      * Tandem repeat sort
      */
-    fun trSort(ISA: Int, n: Int, depth: Int) {
-        var budget = TRBudget(trIlg(n) * 2 / 3, n)
-        var ISAd: Int
+    private fun trSort(ISA: Int, n: Int, depth: Int) {
+        val budget = TRBudget(trIlg(n) * 2 / 3, n)
+        var ISAd: Int = ISA + depth
         var first: Int
         var last: Int// SA pointers
         var t: Int
         var skip: Int
         var unsorted: Int
-        ISAd = ISA + depth
         while (-n < SA[0]) {
             first = 0
             skip = 0
@@ -1485,12 +1449,12 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun trPartition(ISAd: Int, first: Int, middle: Int,
-                    last: Int, pa: Int, pb: Int, v: Int): TRPartitionResult {
+    private fun trPartition(ISAd: Int, first: Int, middle: Int,
+                            last: Int, pa: Int, pb: Int, v: Int): TRPartitionResult {
         var first = first
         var last = last
         var a: Int
-        var b: Int
+        var b: Int = middle - 1
         var c: Int
         var d: Int
         var e: Int
@@ -1499,13 +1463,12 @@ class DivSufSort : ISuffixArrayBuilder {
         var s: Int
         var x = 0
 
-        b = middle - 1
         while ((++b < last) && ((SA[ISAd + SA[b]].also { x = it }) == v)) {
         }
         if (((b.also { a = it }) < last) && (x < v)) {
             while ((++b < last) && ((SA[ISAd + SA[b]].also { x = it }) <= v)) {
                 if (x == v) {
-                    swapInSA(a, b)
+                    SA.swap(a to b)
                     ++a
                 }
             }
@@ -1516,22 +1479,22 @@ class DivSufSort : ISuffixArrayBuilder {
         if ((b < (c.also { d = it })) && (x > v)) {
             while ((b < --c) && ((SA[ISAd + SA[c]].also { x = it }) >= v)) {
                 if (x == v) {
-                    swapInSA(c, d)
+                    SA.swap(c to d)
                     --d
                 }
             }
         }
         while (b < c) {
-            swapInSA(c, b)
+            SA.swap(c to b)
             while ((++b < c) && ((SA[ISAd + SA[b]].also { x = it }) <= v)) {
                 if (x == v) {
-                    swapInSA(a, b)
+                    SA.swap(a to b)
                     ++a
                 }
             }
             while ((b < --c) && ((SA[ISAd + SA[c]].also { x = it }) >= v)) {
                 if (x == v) {
-                    swapInSA(c, d)
+                    SA.swap(c to d)
                     --d
                 }
             }
@@ -1545,7 +1508,7 @@ class DivSufSort : ISuffixArrayBuilder {
             e = first
             f = b - s
             while (0 < s) {
-                swapInSA(e, f)
+                SA.swap(e to f)
                 --s
                 ++e
                 ++f
@@ -1556,7 +1519,7 @@ class DivSufSort : ISuffixArrayBuilder {
             e = b
             f = last - s
             while (0 < s) {
-                swapInSA(e, f)
+                SA.swap(e to f)
                 --s
                 ++e
                 ++f
@@ -1567,29 +1530,28 @@ class DivSufSort : ISuffixArrayBuilder {
         return TRPartitionResult(first, last)
     }
 
-    fun trIntroSort(ISA: Int, ISAd: Int, first: Int, last: Int, budget: TRBudget) {
+    private fun trIntroSort(ISA: Int, ISAd: Int, first: Int, last: Int, budget: TRBudget) {
         var ISAd = ISAd
         var first = first
         var last = last
-        var STACK_SIZE = TR_STACKSIZE
-        var stack = Array<StackElement>(STACK_SIZE) { SENIL }
+        val STACK_SIZE = TR_STACKSIZE
+        val stack = Array(STACK_SIZE) { SENIL }
         var a = 0
         var b = 0
         var c: Int// pointers
         var v: Int
         var x = 0
-        var incr = ISAd - ISA
+        val incr = ISAd - ISA
         var limit: Int
         var next: Int
-        var ssize: Int
+        var ssize: Int = 0
         var trlink = -1
-        ssize = 0
         limit = trIlg(last - first)
         while (true) {
             if (limit < 0) {
                 if (limit == -1) {
                     /* tandem repeat partition */
-                    var res = trPartition(ISAd - incr, first, first, last,
+                    val res = trPartition(ISAd - incr, first, first, last,
                             a, b, last - 1)
                     a = res.a
                     b = res.b
@@ -1628,7 +1590,7 @@ class DivSufSort : ISuffixArrayBuilder {
                             limit = trIlg(last - b)
                         } else {
                             if (ssize > 0) {
-                                var se = stack[--ssize]
+                                val se = stack[--ssize]
                                 ISAd = se.a
                                 first = se.b
                                 last = se.c
@@ -1649,7 +1611,7 @@ class DivSufSort : ISuffixArrayBuilder {
                             limit = trIlg(a - first)
                         } else {
                             if (ssize > 0) {
-                                var se = stack[--ssize]
+                                val se = stack[--ssize]
                                 ISAd = se.a
                                 first = se.b
                                 last = se.c
@@ -1739,7 +1701,7 @@ class DivSufSort : ISuffixArrayBuilder {
                                 limit = -3
                             } else {
                                 if (ssize > 0) {
-                                    var se = stack[--ssize]
+                                    val se = stack[--ssize]
                                     ISAd = se.a
                                     first = se.b
                                     last = se.c
@@ -1752,7 +1714,7 @@ class DivSufSort : ISuffixArrayBuilder {
                         }
                     } else {
                         if (ssize > 0) {
-                            var se = stack[--ssize]
+                            val se = stack[--ssize]
                             ISAd = se.a
                             first = se.b
                             last = se.c
@@ -1788,12 +1750,12 @@ class DivSufSort : ISuffixArrayBuilder {
                 continue
             }
             // choose pivot
-            a = trPivot(ISAd, first, last)
-            swapInSA(first, a)
+            a = trPivot(ISAd, first to last)
+            SA.swap(first to a)
             v = SA[ISAd + SA[first]]
 
             // partition
-            var res = trPartition(ISAd, first, first + 1, last, a, b, v)
+            val res = trPartition(ISAd, first, first + 1, last, a, b, v)
             a = res.a
             b = res.b
 
@@ -1918,10 +1880,10 @@ class DivSufSort : ISuffixArrayBuilder {
                             first = b
                         } else {
                             if (ssize > 0) {
-                                var se = stack[--ssize]
-                                ISAd = se.a
+                                val se: StackElement = stack[--ssize]
+                                ISAd  = se.a
                                 first = se.b
-                                last = se.c
+                                last  = se.c
                                 limit = se.d
                                 trlink = se.e
                             } else {
@@ -1937,7 +1899,7 @@ class DivSufSort : ISuffixArrayBuilder {
                             last = a
                         } else {
                             if (ssize > 0) {
-                                var se = stack[--ssize]
+                                val se = stack[--ssize]
                                 ISAd = se.a
                                 first = se.b
                                 last = se.c
@@ -1958,7 +1920,7 @@ class DivSufSort : ISuffixArrayBuilder {
                         stack[trlink].d = -1
                     }
                     if (ssize > 0) {
-                        var se = stack[--ssize]
+                        val se = stack[--ssize]
                         ISAd = se.a
                         first = se.b
                         last = se.c
@@ -1977,125 +1939,94 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      * Returns the pivot element.
      */
-    fun trPivot(ISAd: Int, first: Int, last: Int): Int {
-        var first = first
-        var last = last
-        var middle: Int
-        var t: Int
-
-        t = last - first
-        middle = first + t / 2
-
-        if (t <= 512) {
-            if (t <= 32) {
-                return trMedian3(ISAd, first, middle, last - 1)
-            } else {
-                t = t shr 2
-                return trMedian5(ISAd, first, first + t, middle, last - 1 - t, last - 1)
+    private fun trPivot(ISAd: Int, pivot: Pair<Int, Int>): Int = pivot.let { (first, last) ->
+                (last - first).let { t ->
+                    (first + t / 2).let { middle ->
+                        if (t > 512) (t shr 3).let { t ->
+                            trMedian3(ISAd, first, first + t, first + (t shl 1)).let { first ->
+                                trMedian3(ISAd, middle - t, middle, middle + t).let { middle ->
+                                    trMedian3(ISAd, last - 1 - (t shl 1), last - 1 - t, last - 1).let { last ->
+                                        trMedian3(ISAd, first, middle, last)
+                                    }
+                                }
+                            }
+                        } else return if (t <= 32) trMedian3(ISAd, first, middle, last - 1) else (t shr 2).let { t ->
+                            trMedian5(ISAd, first, first + t, middle, last - 1 - t, last - 1)
+                        }
+                    }
+                }
             }
-        }
-        t = t shr 3
-        first = trMedian3(ISAd, first, first + t, first + (t shl 1))
-        middle = trMedian3(ISAd, middle - t, middle, middle + t)
-        last = trMedian3(ISAd, last - 1 - (t shl 1), last - 1 - t, last - 1)
-        return trMedian3(ISAd, first, middle, last)
-    }
 
     /**
      * Returns the median of five elements.
      */
-    fun trMedian5(ISAd: Int, v1: Int, v2: Int, v3: Int, v4: Int, v5: Int): Int {
-        var v1 = v1
-        var v2 = v2
-        var v3 = v3
-        var v4 = v4
-        var v5 = v5
-        var t: Int
-        if (SA[ISAd + SA[v2]] > SA[ISAd + SA[v3]]) {
-            t = v2
-            v2 = v3
-            v3 = t
+    fun trMedian5(ISAd: Int, vararg v: Int): Int {
+
+        if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[2]]]) {
+            v.swap(1 to 2)
         }
-        if (SA[ISAd + SA[v4]] > SA[ISAd + SA[v5]]) {
-            t = v4
-            v4 = v5
-            v5 = t
+        if (SA[ISAd + SA[v[3]]] > SA[ISAd + SA[v[4]]]) {
+            v.swap(3 to 4)
         }
-        if (SA[ISAd + SA[v2]] > SA[ISAd + SA[v4]]) {
-            t = v2
-            v2 = v4
-            v4 = t
-            t = v3
-            v3 = v5
-            v5 = t
+        if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[3]]]) {
+            v.swap(1 to 3, 2 to 4)
         }
-        if (SA[ISAd + SA[v1]] > SA[ISAd + SA[v3]]) {
-            t = v1
-            v1 = v3
-            v3 = t
+        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[2]]]) {
+            v.swap(0 to 2)
         }
-        if (SA[ISAd + SA[v1]] > SA[ISAd + SA[v4]]) {
-            t = v1
-            v1 = v4
-            v4 = t
-            t = v3
-            v3 = v5
-            v5 = t
+        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[3]]]) {
+            v.swap(0 to 3, 2 to 4)
         }
-        return if (SA[ISAd + SA[v3]] > SA[ISAd + SA[v4]]) {
-            v4
-        } else v3
+        return if (SA[ISAd + SA[v[2]]] > SA[ISAd + SA[v[3]]]) {
+            v[3]
+        } else v[2]
     }
 
     /**
      * Returns the median of three elements.
      */
-    fun trMedian3(ISAd: Int, v1: Int, v2: Int, v3: Int): Int {
-        var v1 = v1
-        var v2 = v2
-        if (SA[ISAd + SA[v1]] > SA[ISAd + SA[v2]]) {
-            var t = v1
-            v1 = v2
-            v2 = t
+    private fun trMedian3(ISAd: Int, vararg v: Int): Int {
+        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[1]]]) {
+            v.swap(0 to 1)
         }
-        if (SA[ISAd + SA[v2]] > SA[ISAd + SA[v3]]) {
-            return if (SA[ISAd + SA[v1]] > SA[ISAd + SA[v3]]) {
-                v1
+        if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[2]]]) {
+            return if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[2]]]) {
+                v[0]
             } else {
-                v3
+                v[2]
             }
         }
-        return v2
+        return v[1]
     }
 
     /**
      *
      */
-    fun trHeapSort(ISAd: Int, sa: Int, size: Int) {
-        var i: Int
-        var m: Int
-        var t: Int
+    private fun trHeapSort(ISAd: Int, sa: Int, size: Int) {
+        var m: Int = size
 
-        m = size
         if ((size % 2) == 0) {
             m--
             if (SA[ISAd + SA[sa + m / 2]] < SA[ISAd + SA[sa + m]]) {
-                swapInSA(sa + m, sa + m / 2)
+                SA.swap(sa + m to sa + m / 2)
             }
         }
 
+        var i: Int
         i = m / 2 - 1
         while (0 <= i) {
             trFixDown(ISAd, sa, i, m)
             --i
         }
         if ((size % 2) == 0) {
-            swapInSA(sa, sa + m)
+            SA.swap(sa to sa + m)
             trFixDown(ISAd, sa, 0, m)
         }
         i = m - 1
+
+
         while (0 < i) {
-            t = SA[sa]
+            val t = SA[sa]
             SA[sa] = SA[sa + i]
             trFixDown(ISAd, sa, 0, i)
             SA[sa + i] = t
@@ -2107,12 +2038,12 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      *
      */
-    fun trFixDown(ISAd: Int, sa: Int, i: Int, size: Int) {
+    private fun trFixDown(ISAd: Int, sa: Int, i: Int, size: Int) {
         var i = i
         var j: Int
         var k: Int
-        var v: Int
-        var c: Int
+        val v: Int
+        val c: Int
         var d: Int
         var e: Int
 
@@ -2136,13 +2067,12 @@ class DivSufSort : ISuffixArrayBuilder {
 
     /**
      */
-    fun trInsertionSort(ISAd: Int, first: Int, last: Int) {
-        var a: Int
+    private fun trInsertionSort(ISAd: Int, first: Int, last: Int) {
+        var a: Int = first + 1
         var b: Int// SA ptr
         var t: Int
         var r: Int
 
-        a = first + 1
         while (a < last) {
             t = SA[a]
             b = a - 1
@@ -2165,20 +2095,17 @@ class DivSufSort : ISuffixArrayBuilder {
 
     /**
      */
-    fun trPartialCopy(ISA: Int, first: Int, a: Int, b: Int, last: Int, depth: Int) {
-        var c: Int
-        var d: Int
+    private fun trPartialCopy(ISA: Int, first: Int, a: Int, b: Int, last: Int, depth: Int) {
+        var c: Int = first
+        var d: Int = a - 1
         var e: Int// ptr
         var s: Int
-        var v: Int
+        val v: Int = b - 1
         var rank: Int
         var lastrank: Int
         var newrank = -1
 
-        v = b - 1
         lastrank = -1
-        c = first
-        d = a - 1
         while (c <= d) {
             if ((0 <= (SA[c] - depth.also { s = it })) && (SA[ISA + s] == v)) {
                 SA[++d] = s
@@ -2229,16 +2156,13 @@ class DivSufSort : ISuffixArrayBuilder {
      * sort suffixes of middle partition by using sorted order of suffixes of left and
      * right partition.
      */
-    fun trCopy(ISA: Int, first: Int, a: Int, b: Int, last: Int, depth: Int) {
-        var c: Int
-        var d: Int
-        var e: Int// ptr
+    private fun trCopy(ISA: Int, first: Int, a: Int, b: Int, last: Int, depth: Int) {
+        var c: Int = first
+        var d: Int = a - 1
+        val e: Int// ptr
         var s: Int
-        var v: Int
+        val v: Int = b - 1
 
-        v = b - 1
-        c = first
-        d = a - 1
         while (c <= d) {
             s = SA[c] - depth
             if ((0 <= s) && (SA[ISA + s] == v)) {
@@ -2264,60 +2188,52 @@ class DivSufSort : ISuffixArrayBuilder {
 
         /* constants */
 
-        var DEFAULT_ALPHABET_SIZE = 256
-        var SS_INSERTIONSORT_THRESHOLD = 8
-        var SS_BLOCKSIZE = 1024
-        var SS_MISORT_STACKSIZE = 16
-        var SS_SMERGE_STACKSIZE = 32
-        var TR_STACKSIZE = 64
-        var TR_INSERTIONSORT_THRESHOLD = 8
+        val DEFAULT_ALPHABET_SIZE = 256
+        val SS_INSERTIONSORT_THRESHOLD = 8
+        val SS_BLOCKSIZE = 1024
+        val SS_MISORT_STACKSIZE = 16
+        val SS_SMERGE_STACKSIZE = 32
+        val TR_STACKSIZE = 64
+        val TR_INSERTIONSORT_THRESHOLD = 8
 
-        var sqq_table = intArrayOf(0, 16, 22, 27, 32, 35, 39, 42, 45, 48, 50, 53, 55, 57, 59, 61, 64, 65, 67, 69, 71, 73, 75, 76, 78, 80, 81, 83, 84, 86, 87, 89, 90, 91, 93, 94, 96, 97, 98, 99, 101, 102, 103, 104, 106, 107, 108, 109, 110, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 128, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 144, 145, 146, 147, 148, 149, 150, 150, 151, 152, 153, 154, 155, 155, 156, 157, 158, 159, 160, 160, 161, 162, 163, 163, 164, 165, 166, 167, 167, 168, 169, 170, 170, 171, 172, 173, 173, 174, 175, 176, 176, 177, 178, 178, 179, 180, 181, 181, 182, 183, 183, 184, 185, 185, 186, 187, 187, 188, 189, 189, 190, 191, 192, 192, 193, 193, 194, 195, 195, 196, 197, 197, 198, 199, 199, 200, 201, 201, 202, 203, 203, 204, 204, 205, 206, 206, 207, 208, 208, 209, 209, 210, 211, 211, 212, 212, 213, 214, 214, 215, 215, 216, 217, 217, 218, 218, 219, 219, 220, 221, 221, 222, 222, 223, 224, 224, 225, 225, 226, 226, 227, 227, 228, 229, 229, 230, 230, 231, 231, 232, 232, 233, 234, 234, 235, 235, 236, 236, 237, 237, 238, 238, 239, 240, 240, 241, 241, 242, 242, 243, 243, 244, 244, 245, 245, 246, 246, 247, 247, 248, 248, 249, 249, 250, 250, 251, 251, 252, 252, 253, 253, 254, 254, 255)
+        private var sqq_table = intArrayOf(0, 16, 22, 27, 32, 35, 39, 42, 45, 48, 50, 53, 55, 57, 59, 61, 64, 65, 67, 69, 71, 73, 75, 76, 78, 80, 81, 83, 84, 86, 87, 89, 90, 91, 93, 94, 96, 97, 98, 99, 101, 102, 103, 104, 106, 107, 108, 109, 110, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 128, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 144, 145, 146, 147, 148, 149, 150, 150, 151, 152, 153, 154, 155, 155, 156, 157, 158, 159, 160, 160, 161, 162, 163, 163, 164, 165, 166, 167, 167, 168, 169, 170, 170, 171, 172, 173, 173, 174, 175, 176, 176, 177, 178, 178, 179, 180, 181, 181, 182, 183, 183, 184, 185, 185, 186, 187, 187, 188, 189, 189, 190, 191, 192, 192, 193, 193, 194, 195, 195, 196, 197, 197, 198, 199, 199, 200, 201, 201, 202, 203, 203, 204, 204, 205, 206, 206, 207, 208, 208, 209, 209, 210, 211, 211, 212, 212, 213, 214, 214, 215, 215, 216, 217, 217, 218, 218, 219, 219, 220, 221, 221, 222, 222, 223, 224, 224, 225, 225, 226, 226, 227, 227, 228, 229, 229, 230, 230, 231, 231, 232, 232, 233, 234, 234, 235, 235, 236, 236, 237, 237, 238, 238, 239, 240, 240, 241, 241, 242, 242, 243, 243, 244, 244, 245, 245, 246, 246, 247, 247, 248, 248, 249, 249, 250, 250, 251, 251, 252, 252, 253, 253, 254, 254, 255)
 
-        var lg_table = intArrayOf(-1, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7)
+        private var lg_table = intArrayOf(-1, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7)
 
-        fun getIDX(a: Int): Int {
-            return if ((0 <= (a))) (a) else ((a).inv())
-        }
+        fun getIDX(a: Int): Int = if (0 <= a) a else a.inv()
 
-        fun min(a: Int, b: Int): Int {
-            return if (a < b) a else b
-        }
 
         /**
          *
          */
         fun ssIsqrt(x: Int): Int {
-            var y: Int
-            var e: Int
-
-            if (x >= (SS_BLOCKSIZE * SS_BLOCKSIZE)) {
-                return SS_BLOCKSIZE
-            }
-            e = if (((x and -0x10000) != 0))
-                (if (((x and -0x1000000) != 0))
+            if (x >= (SS_BLOCKSIZE * SS_BLOCKSIZE)) return SS_BLOCKSIZE
+            val e = if (((x and -0x10000) != 0))
+                if (x and -0x1000000 != 0)
                     24 + lg_table[(x shr 24) and 0xff]
                 else
-                    16 + lg_table[(x shr 16) and 0xff])
+                    16 + lg_table[(x shr 16) and 0xff]
             else
-                (if (((x and 0x0000ff00) != 0))
+                if (x and 0x0000ff00 != 0)
                     8 + lg_table[(x shr 8) and 0xff]
                 else
-                    0 + lg_table[(x shr 0) and 0xff])
+                    0 + lg_table[(x shr 0) and 0xff]
 
-            if (e >= 16) {
-                y = sqq_table[x shr ((e - 6) - (e and 1))] shl ((e shr 1) - 7)
-                if (e >= 24) {
+            var y: Int
+            when {
+                e >= 16 -> {
+                    y = sqq_table[x shr ((e - 6) - (e and 1))] shl ((e shr 1) - 7)
+                    if (e >= 24) y = (y + 1 + x / y) shr 1
                     y = (y + 1 + x / y) shr 1
                 }
-                y = (y + 1 + x / y) shr 1
-            } else if (e >= 8) {
-                y = (sqq_table[x shr ((e - 6) - (e and 1))] shr (7 - (e shr 1))) + 1
-            } else {
-                return sqq_table[x] shr 4
+                e >= 8 -> y = (sqq_table[x shr ((e - 6) - (e and 1))] shr (7 - (e shr 1))) + 1
+                else -> return sqq_table[x] shr 4
             }
 
-            return if ((x < (y * y))) y - 1 else y
+            when {
+                x < y * y -> return y - 1
+                else -> return y
+            }
         }
 
         /**
@@ -2347,32 +2263,40 @@ class DivSufSort : ISuffixArrayBuilder {
                     0 + lg_table[(n shr 0) and 0xff])
         }
 
-        val SA: SufAssert = SufAssert()
-        fun assert(vf: Boolean, s: () -> Any = { "" }) = SA.sufAssert(vf, s)
-    }
+        /**
+         * Calculate minimum and maximum value for a slice of an array.
+         */
+        private fun minmax(input: IntArray, start: Int, length: Int): Pair<Int, Int> {
+            var max = input[start]
+            var min = max
+            var i = length - 2
+            var index = start + 1
+            while (i >= 0) {
+                val v = input[index]
+                if (v > max) {
+                    max = v
+                }
+                if (v < min) {
+                    min = v
+                }
+                i--
+                index++
+            }
 
-    /**
-     * Calculate minimum and maximum value for a slice of an array.
-     */
-    fun minmax(input: IntArray, start: Int, length: Int): MinMax {
-        var max = input[start]
-        var min = max
-        var i = length - 2
-        var index = start + 1
-        while (i >= 0) {
-            val v = input[index]
-            if (v > max) {
-                max = v
-            }
-            if (v < min) {
-                min = v
-            }
-            i--
-            index++
+            return min to max
         }
 
-        return MinMax(min, max)
+        private val SA: SufAssert = SufAssert()
+        fun assert(vf: Boolean, s: () -> Any = { "" }) = SA.sufAssert(vf, s)
+
+        fun IntArray.swap(vararg p: Pair<Int, Int>) = p.forEach { (i, i1) ->
+            apply {
+                this[i] = this[i] xor this[i1]
+                this[i1] = this[i1] xor this[i]
+                this[i] = this[i] xor this[i1]
+            }
+        }.let { this }
     }
 
-}
 
+}
