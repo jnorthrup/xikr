@@ -6,7 +6,7 @@ import kotlin.test.*
  * A set of shared tests and preconditions that all implementations of
  * [ISuffixArrayBuilder] should meet.
  */
-abstract class SuffixArrayBuilderTestBase {
+abstract class JvmSuffixArrayBuilderTestBase {
     lateinit var  builder: ISuffixArrayBuilder
 
     var smallAlphabet: MinMax = MinMax(-5, 5)
@@ -218,7 +218,7 @@ private fun IntArray.clone(): IntArray =copyOf()
 /**
  * Tests for [DivSufSort].
  */
-class DivSufSortTest : SuffixArrayBuilderTestBase() {
+class JvmDivSufSortTest : SuffixArrayBuilderTestBase() {
     private val alphabetSize = 256
 
     /*

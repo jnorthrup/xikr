@@ -1,6 +1,60 @@
 package org.jsuffixarrays
 
-import kotlin.jvm.JvmOverloads
+import kotlin.math.min
+
+/**
+ * Symbol mappers (reversible int-coding).
+ */
+internal interface ISymbolMapper {
+    fun map(input: IntArray, start: Int, length: Int)
+    fun undo(input: IntArray, start: Int, length: Int)
+}
+
+
+/**
+ * An adapter for constructing suffix arrays on character sequences.
+ *
+ * @see SuffixArrays.create
+ * @see SuffixArrays.create
+ */
+internal class CharSequenceAdapter
+/**
+ * Construct an adapter with a given underlying suffix array construction strategy.
+ * The suffix array builder should accept non-negative characters, with a possibly
+ * large alphabet size.
+ *
+ * @see DensePositiveDecorator
+ */
+(private val delegate: ISuffixArrayBuilder) {
+
+    /**
+     * Last mapped input in [.buildSuffixArray].
+     */
+    lateinit var input: IntArray
+
+    /**
+     * Construct a suffix array for a given character sequence.
+     */
+    fun buildSuffixArray(sequence: CharSequence): IntArray {
+        /*
+         * Allocate slightly more space, some suffix construction strategies need it and
+         * we don't want to waste space for multiple symbol mappings.
+         */
+
+        this.input = IntArray(sequence.length + SuffixArrays.MAX_EXTRA_TRAILING_SPACE)
+        for (i in sequence.length - 1 downTo 0) {
+            input[i] = sequence[i].toInt()
+        }
+
+        val start = 0
+        val length = sequence.length
+
+        val mapper = DensePositiveMapper(input, start, length)
+        mapper.map(input, start, length)
+
+        return delegate.buildSuffixArray(input, start, length)
+    }
+}
 
 /**
  *
@@ -19,26 +73,29 @@ import kotlin.jvm.JvmOverloads
  * The implementation of this algorithm makes some assumptions about the input. See
  * [.buildSuffixArray] for details.
  */
-class DivSufSort : ISuffixArrayBuilder {
+class DivSufSort
+/**
+ * @param alphabetSize
+ */(alphabetSize: Int = 256) : ISuffixArrayBuilder {
 
     /* fields */
-    private val ALPHABET_SIZE: Int
+    private val ALPHABET_SIZE: Int = alphabetSize
     private val BUCKET_A_SIZE: Int
     private val BUCKET_B_SIZE: Int
-    lateinit var SA: IntArray
-    lateinit var T: IntArray
+    private lateinit var SA: IntArray
+    private lateinit var T: IntArray
     private var start: Int = 0
 
     /*
      *
      */
-    class StackElement @JvmOverloads internal constructor(internal val a: Int, internal val b: Int, internal val c: Int, internal var d: Int, internal val e: Int = 0)
+    class StackElement internal constructor(internal val a: Int, internal val b: Int, internal val c: Int, internal var d: Int, internal val e: Int = 0)
 
     /*
      *
      */
-    class TRBudget(internal var chance: Int, internal var remain: Int) {
-        internal var incval: Int = 0
+    class TRBudget(private var chance: Int, private var remain: Int) {
+        private var incval: Int = 0
         internal var count: Int = 0
 
         init {
@@ -65,44 +122,6 @@ class DivSufSort : ISuffixArrayBuilder {
      */
     private class TRPartitionResult(internal val a: Int, internal val b: Int)
 
-    constructor() {
-        ALPHABET_SIZE = DEFAULT_ALPHABET_SIZE
-        BUCKET_A_SIZE = ALPHABET_SIZE
-        BUCKET_B_SIZE = ALPHABET_SIZE * ALPHABET_SIZE
-    }
-
-    /**
-     * @param alphabetSize
-     */
-    constructor(alphabetSize: Int) {
-        ALPHABET_SIZE = alphabetSize
-        BUCKET_A_SIZE = ALPHABET_SIZE
-        BUCKET_B_SIZE = ALPHABET_SIZE * ALPHABET_SIZE
-    }
-
-    /**
-     * Calculate minimum and maximum value for a slice of an array.
-     */
-    fun minmax(input: IntArray, start: Int, length: Int): MinMax {
-        var max = input[start]
-        var min = max
-        var i = length - 2
-        var index = start + 1
-        while (i >= 0) {
-            val v = input[index]
-            if (v > max) {
-                max = v
-            }
-            if (v < min) {
-                min = v
-            }
-            i--
-            index++
-        }
-
-        return MinMax(min, max)
-    }
-
     /**
      * {@inheritDoc}
      *
@@ -117,11 +136,11 @@ class DivSufSort : ISuffixArrayBuilder {
      *
      */
     override fun buildSuffixArray(input: IntArray, start: Int, length: Int): IntArray {
-        //       assertAlways(input != null, "input must not be null")
-//        assertAlways(length >= 2, "input length must be >= 2")
+//        assert (input != null, "input must not be null")
+//        assert (length >= 2, "input length must be >= 2")
         val mm = minmax(input, start, length)
-//        assertAlways(mm.min >= 0, "input must not be negative")
-//        assertAlways(mm.max < ALPHABET_SIZE, "max alphabet size is $ALPHABET_SIZE")
+//        assert (mm.min >= 0, "input must not be negative")
+//        assert (mm.max < ALPHABET_SIZE, "max alphabet size is $ALPHABET_SIZE")
 
         val ret = IntArray(length)
         this.SA = ret
@@ -133,18 +152,6 @@ class DivSufSort : ISuffixArrayBuilder {
         val m = sortTypeBstar(bucket_A, bucket_B, length)
         constructSuffixArray(bucket_A, bucket_B, length, m)
         return ret
-    }
-
-    /**
-     * Holder for minimum and maximum.
-     *
-     * @see Tools.minmax
-     */
-    class MinMax(val min: Int, val max: Int) {
-
-        fun range(): Int {
-            return max - min
-        }
     }
 
     /**
@@ -243,7 +250,7 @@ class DivSufSort : ISuffixArrayBuilder {
         var j: Int
         var k: Int
         var t: Int
-        var m: Int
+        var m: Int = n
         val bufsize: Int
         var c0: Int
         var c1 = 0
@@ -254,7 +261,6 @@ class DivSufSort : ISuffixArrayBuilder {
          * suffixes into the array SA.
          */
         i = n - 1
-        m = n
         c0 = T[start + n - 1]
         while (0 <= i) {
             /* type A suffix. */
@@ -506,15 +512,11 @@ class DivSufSort : ISuffixArrayBuilder {
      * `ss_compare(T, &(PAi[0]), PA + *a, depth)` situation.
      */
     private fun ssCompare(pa: Int, pb: Int, p2: Int, depth: Int): Int {
-        var U1: Int
-        var U2: Int
-        val U1n: Int
-        val U2n: Int// pointers to T
+        var U1: Int = depth + pa
+        var U2: Int = depth + SA[p2]
+        val U1n: Int = pb + 2
+        val U2n: Int = SA[p2 + 1] + 2// pointers to T
 
-        U1 = depth + pa
-        U2 = depth + SA[p2]
-        U1n = pb + 2
-        U2n = SA[p2 + 1] + 2
         while (U1 < U1n
                 && U2 < U2n && T[start + U1] == T[start + U2]) {
             ++U1
@@ -534,15 +536,11 @@ class DivSufSort : ISuffixArrayBuilder {
      *
      */
     private fun ssCompare(p1: Int, p2: Int, depth: Int): Int {
-        var U1: Int
-        var U2: Int
-        val U1n: Int
-        val U2n: Int// pointers to T
+        var U1: Int = depth + SA[p1]
+        var U2: Int = depth + SA[p2]
+        val U1n: Int = SA[p1 + 1] + 2
+        val U2n: Int = SA[p2 + 1] + 2// pointers to T
 
-        U1 = depth + SA[p1]
-        U2 = depth + SA[p2]
-        U1n = SA[p1 + 1] + 2
-        U2n = SA[p2 + 1] + 2
         while (U1 < U1n
                 && U2 < U2n && T[start + U1] == T[start + U2]) {
             ++U1
@@ -701,7 +699,7 @@ class DivSufSort : ISuffixArrayBuilder {
         }
     }
 
-    val NILSE = StackElement(Int.MIN_VALUE, Int.MIN_VALUE, Int.MIN_VALUE, Int.MIN_VALUE, Int.MIN_VALUE)
+    private val NILSE = StackElement(Int.MIN_VALUE, Int.MIN_VALUE, Int.MIN_VALUE, Int.MIN_VALUE, Int.MIN_VALUE)
     /**
      * D&C based merge.
      */
@@ -713,146 +711,85 @@ class DivSufSort : ISuffixArrayBuilder {
         // Pa, first, middle, last and buf - pointers in SA array
 
         val STACK_SIZE = SS_SMERGE_STACKSIZE
-        val stack = Array<StackElement>(STACK_SIZE) { NILSE }
-        var l: Int
-        var r: Int
-        var lm: Int
-        var rm: Int// pointers in SA
-        var m: Int
-        var len: Int
-        var half: Int
-        var ssize: Int
-        var check: Int
-        var next: Int
+        val stack = Array(STACK_SIZE) { NILSE }
+        var ssize = 0
 
-        check = 0
-        ssize = 0
-        while (true) {
+        var check = 0
+        do {
+            if (last - middle > bufsize) {
+                if (middle - first > bufsize) {
+                    var m = 0
+                    var len = min(middle - first, last - middle)
 
-            if (last - middle <= bufsize) {
-                if (first < middle && middle < last) {
-                    ssMergeBackward(PA, first, middle, last, buf, depth)
-                }
-                if (check and 1 != 0 || check and 2 != 0 && ssCompare(PA + getIDX(SA[first - 1]), PA + SA[first], depth) == 0) {
-                    SA[first] = SA[first].inv()
-                }
-                if (check and 4 != 0 && ssCompare(PA + getIDX(SA[last - 1]), PA + SA[last], depth) == 0) {
-                    SA[last] = SA[last].inv()
-                }
+                    var half = len shr 1
+                    while (0 < len) {
+                        if (ssCompare(PA + getIDX(SA[middle + m + half]), PA + getIDX(SA[middle - m - half - 1]), depth) < 0) {
+                            m += half + 1
+                            half -= len and 1 xor 1
+                        }
+                        len = half
+                        half = half shr 1
+                    }
 
-                if (ssize > 0) {
-                    val se = stack[--ssize]
-                    first = se.a
-                    middle = se.b
-                    last = se.c
-                    check = se.d
-                } else {
-                    return
-                }
-                continue
-            }
-
-            if (middle - first <= bufsize) {
-                if (first < middle) {
-                    ssMergeForward(PA, first, middle, last, buf, depth)
-                }
-                if (check and 1 != 0 || check and 2 != 0 && ssCompare(PA + getIDX(SA[first - 1]), PA + SA[first], depth) == 0) {
-                    SA[first] = SA[first].inv()
-                }
-                if (check and 4 != 0 && ssCompare(PA + getIDX(SA[last - 1]), PA + SA[last], depth) == 0) {
-                    SA[last] = SA[last].inv()
-                }
-
-                if (ssize > 0) {
-                    val se = stack[--ssize]
-                    first = se.a
-                    middle = se.b
-                    last = se.c
-                    check = se.d
-                } else {
-                    return
-                }
-
-                continue
-            }
-
-            m = 0
-            len = min(middle - first, last - middle)
-            half = len shr 1
-            while (0 < len) {
-                if (ssCompare(PA + getIDX(SA[middle + m + half]), PA + getIDX(SA[middle - m - half - 1]), depth) < 0) {
-                    m += half + 1
-                    half -= len and 1 xor 1
-                }
-                len = half
-                half = half shr 1
-            }
-
-            if (0 < m) {
-                lm = middle - m
-                rm = middle + m
-                ssBlockSwap(lm, middle, m)
-                r = middle
-                l = r
-                next = 0
-                if (rm < last) {
-                    if (SA[rm] < 0) {
-                        SA[rm] = SA[rm].inv()
-                        if (first < lm) {
-                            while (SA[--l] < 0) {
+                    if (0 < m) {
+                        var lm = middle - m
+                        var rm = middle + m
+                        ssBlockSwap(lm, middle, m)
+                        var r = middle
+                        var l = r
+                        var next = 0
+                        if (rm < last) {
+                            if (SA[rm] < 0) {
+                                SA[rm] = SA[rm].inv()
+                                if (first < lm) {
+                                    while (SA[--l] < 0) {
+                                    }
+                                    next = next or 4
+                                }
+                                next = next or 1
+                            } else if (first < lm) {
+                                while (SA[r] < 0)
+                                    ++r
+                                next = next or 2
                             }
-                            next = next or 4
                         }
-                        next = next or 1
-                    } else if (first < lm) {
-                        while (SA[r] < 0) {
-                            ++r
+
+                        if (l - first > last - r) {
+                            if (next and 2 != 0 && r == middle)
+                                next = next xor 6
+                            stack[ssize++] = StackElement(first, lm, l, check and 3 or (next and 4))
+
+                            first = r
+                            middle = rm
+                            check = next and 3 or (check and 4)
+                        } else {
+                            stack[ssize++] = StackElement(r, rm, last, next and 3 or (check and 4))
+
+                            middle = lm
+                            last = l
+                            check = check and 3 or (next and 4)
                         }
-                        next = next or 2
+                        continue
                     }
-                }
+                    if (ssCompare(PA + getIDX(SA[middle - 1]), PA + SA[middle], depth) == 0)
+                        SA[middle] = SA[middle].inv()
+                } else if (first < middle)
+                    ssMergeForward(PA, first, middle, last, buf, depth)
+            } else if (middle in (first + 1)..(last - 1))
+                ssMergeBackward(PA, first, middle, last, buf, depth)
+            if (check and 1 != 0 || check and 2 != 0 && 0 == ssCompare(PA + getIDX(SA[first - 1]), PA + SA[first], depth))
+                SA[first] = SA[first].inv()
+            if (check and 4 != 0 && 0 == ssCompare(PA + getIDX(SA[last - 1]), PA + SA[last], depth))
+                SA[last] = SA[last].inv()
 
-                if (l - first <= last - r) {
-                    stack[ssize++] = StackElement(r, rm, last, next and 3 or (check and 4))
-
-                    middle = lm
-                    last = l
-                    check = check and 3 or (next and 4)
-                } else {
-                    if (next and 2 != 0 && r == middle) {
-                        next = next xor 6
-                    }
-                    stack[ssize++] = StackElement(first, lm, l, check and 3 or (next and 4))
-
-                    first = r
-                    middle = rm
-                    check = next and 3 or (check and 4)
-                }
-            } else {
-                if (ssCompare(PA + getIDX(SA[middle - 1]), PA + SA[middle], depth) == 0) {
-                    SA[middle] = SA[middle].inv()
-                }
-
-                if (check and 1 != 0 || check and 2 != 0 && ssCompare(PA + getIDX(SA[first - 1]), PA + SA[first], depth) == 0) {
-                    SA[first] = SA[first].inv()
-                }
-                if (check and 4 != 0 && ssCompare(PA + getIDX(SA[last - 1]), PA + SA[last], depth) == 0) {
-                    SA[last] = SA[last].inv()
-                }
-
-                if (ssize > 0) {
-                    val se = stack[--ssize]
-                    first = se.a
-                    middle = se.b
-                    last = se.c
-                    check = se.d
-                } else {
-                    return
-                }
-
+            if (ssize > 0) {
+                val se = stack[--ssize]
+                first = se.a
+                middle = se.b
+                last = se.c
+                check = se.d
             }
-
-        }
+        } while (ssize > 0)
 
     }
 
@@ -863,18 +800,15 @@ class DivSufSort : ISuffixArrayBuilder {
                                depth: Int) {
         // PA, first, middle, last, buf are pointers to SA
         var a: Int
-        var b: Int
-        var c: Int
-        val bufend: Int// pointers to SA
+        var b: Int = buf
+        var c: Int = middle
+        val bufend: Int = buf + (middle - first) - 1// pointers to SA
         val t: Int
         var r: Int
 
-        bufend = buf + (middle - first) - 1
         ssBlockSwap(buf, first, middle - first)
 
         t = SA[(first).also { a = it }]
-        b = buf
-        c = middle
         while (true) {
             r = ssCompare(PA + SA[b], PA + SA[c], depth)
             if (r < 0) {
@@ -939,13 +873,12 @@ class DivSufSort : ISuffixArrayBuilder {
         var p2: Int// pointers in SA
         var a: Int
         var b: Int
-        var c: Int
-        val bufend: Int// pointers in SA
+        var c: Int = middle - 1
+        val bufend: Int = buf + (last - middle) - 1// pointers in SA
         val t: Int
         var r: Int
         var x: Int
 
-        bufend = buf + (last - middle) - 1
         ssBlockSwap(buf, middle, last - middle)
 
         x = 0
@@ -963,7 +896,6 @@ class DivSufSort : ISuffixArrayBuilder {
         }
         t = SA[(last - 1).also { a = it }]
         b = bufend
-        c = middle - 1
         while (true) {
             r = ssCompare(p1, p2, depth)
             if (0 < r) {
@@ -1064,12 +996,11 @@ class DivSufSort : ISuffixArrayBuilder {
      */
     private fun ssInsertionSort(PA: Int, first: Int, last: Int, depth: Int) {
         // PA, first, last are pointers in SA
-        var i: Int
+        var i: Int = last - 2
         var j: Int// pointers in SA
         var t: Int
         var r: Int
 
-        i = last - 2
         while (first <= i) {
             t = SA[i]
             j = i + 1
@@ -1096,7 +1027,7 @@ class DivSufSort : ISuffixArrayBuilder {
         var last = last
         var depth = depth
         val STACK_SIZE = SS_MISORT_STACKSIZE
-        val stack = Array<StackElement>(STACK_SIZE) { NILSE }
+        val stack = Array(STACK_SIZE) { NILSE }
         var Td: Int// T ptr
         var a: Int
         var b: Int
@@ -1106,11 +1037,10 @@ class DivSufSort : ISuffixArrayBuilder {
         var f: Int// SA ptr
         var s: Int
         var t: Int
-        var ssize: Int
+        var ssize: Int = 0
         var limit: Int
         var v: Int
         var x = 0
-        ssize = 0
         limit = ssIlg(last - first)
         while (true) {
 
@@ -1317,11 +1247,11 @@ class DivSufSort : ISuffixArrayBuilder {
         middle = first + t / 2
 
         if (t <= 512) {
-            if (t <= 32) {
-                return ssMedian3(Td, PA, first, middle, last - 1)
+            return if (t <= 32) {
+                ssMedian3(Td, PA, first, middle, last - 1)
             } else {
                 t = t shr 2
-                return ssMedian5(Td, PA, first, first + t, middle, last - 1 - t, last - 1)
+                ssMedian5(Td, PA, first, first + t, middle, last - 1 - t, last - 1)
             }
         }
         t = t shr 3
@@ -1402,11 +1332,9 @@ class DivSufSort : ISuffixArrayBuilder {
      * Binary partition for substrings.
      */
     private fun ssPartition(PA: Int, first: Int, last: Int, depth: Int): Int {
-        var a: Int
-        var b: Int// SA pointer
+        var a: Int = first - 1
+        var b: Int = last// SA pointer
         var t: Int
-        a = first - 1
-        b = last
         while (true) {
             while (++a < b && SA[PA + SA[a]] + depth >= SA[PA + SA[a] + 1] + 1) {
                 SA[a] = SA[a].inv()
@@ -1431,10 +1359,9 @@ class DivSufSort : ISuffixArrayBuilder {
      */
     private fun ssHeapSort(Td: Int, PA: Int, sa: Int, size: Int) {
         var i: Int
-        var m: Int
+        var m: Int = size
         var t: Int
 
-        m = size
         if (size % 2 == 0) {
             m--
             if (T[start + Td + SA[PA + SA[sa + m / 2]]] < T[start + Td
@@ -1507,13 +1434,12 @@ class DivSufSort : ISuffixArrayBuilder {
      */
     private fun trSort(ISA: Int, n: Int, depth: Int) {
         val budget = TRBudget(trIlg(n) * 2 / 3, n)
-        var ISAd: Int
+        var ISAd: Int = ISA + depth
         var first: Int
         var last: Int// SA pointers
         var t: Int
         var skip: Int
         var unsorted: Int
-        ISAd = ISA + depth
         while (-n < SA[0]) {
             first = 0
             skip = 0
@@ -1560,7 +1486,7 @@ class DivSufSort : ISuffixArrayBuilder {
         var first = first
         var last = last
         var a: Int
-        var b: Int
+        var b: Int = middle - 1
         var c: Int
         var d: Int
         var e: Int
@@ -1569,7 +1495,6 @@ class DivSufSort : ISuffixArrayBuilder {
         var s: Int
         var x = 0
 
-        b = middle - 1
         while (++b < last && (SA[ISAd + SA[b]]).also { x = it } == v) {
         }
         if ((b).also { a = it } < last && x < v) {
@@ -1651,9 +1576,8 @@ class DivSufSort : ISuffixArrayBuilder {
         val incr = ISAd - ISA
         var limit: Int
         var next: Int
-        var ssize: Int
+        var ssize: Int = 0
         var trlink = -1
-        ssize = 0
         limit = trIlg(last - first)
         while (true) {
             if (limit < 0) {
@@ -1757,16 +1681,12 @@ class DivSufSort : ISuffixArrayBuilder {
                     /* sorted partition */
                     if (0 <= SA[first]) {
                         a = first
-                        do {
-                            SA[ISA + SA[a]] = a
-                        } while (++a < last && 0 <= SA[a])
+                        do SA[ISA + SA[a]] = a while (++a < last && 0 <= SA[a])
                         first = a
                     }
                     if (first < last) {
                         a = first
-                        do {
-                            SA[a] = SA[a].inv()
-                        } while (SA[++a] < 0)
+                        do SA[a] = SA[a].inv() while (SA[++a] < 0)
                         next = if (SA[ISA + SA[a]] != SA[ISAd + SA[a]])
                             trIlg(a - first + 1)
                         else
@@ -2039,9 +1959,7 @@ class DivSufSort : ISuffixArrayBuilder {
                     }
                 }
             }
-
         }
-
     }
 
     /**
@@ -2057,11 +1975,11 @@ class DivSufSort : ISuffixArrayBuilder {
         middle = first + t / 2
 
         if (t <= 512) {
-            if (t <= 32) {
-                return trMedian3(ISAd, first, middle, last - 1)
+            return if (t <= 32) {
+                trMedian3(ISAd, first, middle, last - 1)
             } else {
                 t = t shr 2
-                return trMedian5(ISAd, first, first + t, middle, last - 1 - t, last - 1)
+                trMedian5(ISAd, first, first + t, middle, last - 1 - t, last - 1)
             }
         }
         t = t shr 3
@@ -2072,14 +1990,57 @@ class DivSufSort : ISuffixArrayBuilder {
     }
 
     /**
+     * Returns the median of five elements.
+     */
+    private fun trMedian5(ISAd: Int, vararg v: Int): Int {
+
+        if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[2]]]) {
+            v.swap(1, 2)
+        }
+        if (SA[ISAd + SA[v[3]]] > SA[ISAd + SA[v[4]]]) {
+            v.swap(3, 4)
+        }
+        if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[3]]]) {
+            v.swap(1, 3)
+            v.swap(2, 4)
+        }
+        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[2]]]) {
+            v.swap(0, 2)
+        }
+        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[3]]]) {
+            v.swap(0, 3)
+            v.swap(2, 4)
+        }
+        return if (SA[ISAd + SA[v[2]]] > SA[ISAd + SA[v[3]]]) {
+            v[3]
+        } else v[2]
+    }
+
+    /**
+     * Returns the median of three elements.
+     */
+    private fun trMedian3(ISAd: Int, vararg v: Int): Int {
+
+        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[1]]]) {
+            v.swap(1, 0)
+        }
+        return if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[2]]]) {
+            if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[2]]]) {
+                v[0]
+            } else {
+                v[2]
+            }
+        } else v[1]
+    }
+
+    /**
      *
      */
     private fun trHeapSort(ISAd: Int, sa: Int, size: Int) {
         var i: Int
-        var m: Int
+        var m: Int = size
         var t: Int
 
-        m = size
         if (size % 2 == 0) {
             m--
             if (SA[ISAd + SA[sa + m / 2]] < SA[ISAd + SA[sa + m]]) {
@@ -2140,86 +2101,59 @@ class DivSufSort : ISuffixArrayBuilder {
     /**
      */
     private fun trInsertionSort(ISAd: Int, first: Int, last: Int) {
-        var a: Int
+        var a: Int = first + 1
         var b: Int// SA ptr
         var t: Int
         var r: Int
 
-        a = first + 1
         while (a < last) {
             t = SA[a]
             b = a - 1
             while (0 > (SA[ISAd + t] - SA[ISAd + SA[b]]).also { r = it }) {
-                do {
-                    SA[b + 1] = SA[b]
-                } while (first <= --b && SA[b] < 0)
-                if (b < first) {
-                    break
-                }
-            }
-            if (r == 0) {
-                SA[b] = SA[b].inv()
-            }
-            SA[b + 1] = t
-            ++a
+                do SA[b + 1] = SA[b] while (first <= --b && SA[b] < 0); if (b < first) break
+            }; if (r == 0) SA[b] = SA[b].inv(); SA[b + 1] = t; ++a
         }
-
     }
 
     /**
      */
     private fun trPartialCopy(ISA: Int, first: Int, a: Int, b: Int, last: Int, depth: Int) {
-        var c: Int
-        var d: Int
+        var c: Int = first
+        var d: Int = a - 1
         var e: Int// ptr
         var s: Int
-        val v: Int
+        val v: Int = b - 1
         var rank: Int
         var lastrank: Int
         var newrank = -1
 
-        v = b - 1
         lastrank = -1
-        c = first
-        d = a - 1
         while (c <= d) {
             if (0 <= (SA[c] - depth).also { s = it } && SA[ISA + s] == v) {
-                SA[++d] = s
-                rank = SA[ISA + s + depth]
+                SA[++d] = s; rank = SA[ISA + s + depth]
+
                 if (lastrank != rank) {
                     lastrank = rank
                     newrank = d
                 }
+
                 SA[ISA + s] = newrank
             }
             ++c
         }
-
-        lastrank = -1
-        e = d
+        lastrank = -1; e = d
         while (first <= e) {
             rank = SA[ISA + SA[e]]
             if (lastrank != rank) {
-                lastrank = rank
-                newrank = e
+                lastrank = rank; newrank = e
             }
-            if (newrank != rank) {
-                SA[ISA + SA[e]] = newrank
-            }
-            --e
+            if (newrank != rank) SA[ISA + SA[e]] = newrank; --e
         }
-
-        lastrank = -1
-        c = last - 1
-        e = d + 1
-        d = b
+        lastrank = -1; c = last - 1; e = d + 1; d = b
         while (e < d) {
             if (0 <= (SA[c] - depth).also { s = it } && SA[ISA + s] == v) {
-                SA[--d] = s
-                rank = SA[ISA + s + depth]
-                if (lastrank != rank) {
-                    lastrank = rank
-                    newrank = d
+                SA[--d] = s; rank = SA[ISA + s + depth]; if (lastrank != rank) {
+                    lastrank = rank; newrank = d
                 }
                 SA[ISA + s] = newrank
             }
@@ -2233,15 +2167,12 @@ class DivSufSort : ISuffixArrayBuilder {
      * right partition.
      */
     private fun trCopy(ISA: Int, first: Int, a: Int, b: Int, last: Int, depth: Int) {
-        var c: Int
-        var d: Int
+        var c: Int = first
+        var d: Int = a - 1
         val e: Int// ptr
         var s: Int
-        val v: Int
+        val v: Int = b - 1
 
-        v = b - 1
-        c = first
-        d = a - 1
         while (c <= d) {
             s = SA[c] - depth
             if (0 <= s && SA[ISA + s] == v) {
@@ -2263,61 +2194,16 @@ class DivSufSort : ISuffixArrayBuilder {
         }
     }
 
-    /**
-     * Returns the median of five elements.
-     */
-    private fun trMedian5(ISAd: Int, vararg v: Int): Int {
-
-        if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[2]]]) {
-            v.swap(1, 2)
-        }
-        if (SA[ISAd + SA[v[3]]] > SA[ISAd + SA[v[4]]]) {
-            v.swap(3, 4)
-        }
-        if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[3]]]) {
-            v.swap(1, 3)
-            v.swap(2, 4)
-        }
-        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[2]]]) {
-            v.swap(0, 2)
-        }
-        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[3]]]) {
-            v.swap(0, 3)
-            v.swap(2, 4)
-        }
-        return if (SA[ISAd + SA[v[2]]] > SA[ISAd + SA[v[3]]]) {
-            v[3]
-        } else v[2]
-    }
-
-    /**
-     * Returns the median of three elements.
-     */
-    private fun trMedian3(ISAd: Int, vararg v: Int): Int {
-
-        if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[1]]]) {
-            v.swap(1, 0)
-        }
-        return if (SA[ISAd + SA[v[1]]] > SA[ISAd + SA[v[2]]]) {
-            if (SA[ISAd + SA[v[0]]] > SA[ISAd + SA[v[2]]]) {
-                v[0]
-            } else {
-                v[2]
-            }
-        } else v[1]
-    }
-
     companion object {
 
         /* constants */
 
-        private val DEFAULT_ALPHABET_SIZE = 256
-        private val SS_INSERTIONSORT_THRESHOLD = 8
-        private val SS_BLOCKSIZE = 1024
-        private val SS_MISORT_STACKSIZE = 16
-        private val SS_SMERGE_STACKSIZE = 32
-        private val TR_STACKSIZE = 64
-        private val TR_INSERTIONSORT_THRESHOLD = 8
+        private const val SS_INSERTIONSORT_THRESHOLD = 8
+        private const val SS_BLOCKSIZE = 1024
+        private const val SS_MISORT_STACKSIZE = 16
+        private const val SS_SMERGE_STACKSIZE = 32
+        private const val TR_STACKSIZE = 64
+        private const val TR_INSERTIONSORT_THRESHOLD = 8
 
         private val sqq_table = intArrayOf(0, 16, 22, 27, 32, 35, 39, 42, 45, 48, 50, 53, 55, 57, 59, 61, 64, 65, 67, 69, 71, 73, 75, 76, 78, 80, 81, 83, 84, 86, 87, 89, 90, 91, 93, 94, 96, 97, 98, 99, 101, 102, 103, 104, 106, 107, 108, 109, 110, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 128, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 144, 145, 146, 147, 148, 149, 150, 150, 151, 152, 153, 154, 155, 155, 156, 157, 158, 159, 160, 160, 161, 162, 163, 163, 164, 165, 166, 167, 167, 168, 169, 170, 170, 171, 172, 173, 173, 174, 175, 176, 176, 177, 178, 178, 179, 180, 181, 181, 182, 183, 183, 184, 185, 185, 186, 187, 187, 188, 189, 189, 190, 191, 192, 192, 193, 193, 194, 195, 195, 196, 197, 197, 198, 199, 199, 200, 201, 201, 202, 203, 203, 204, 204, 205, 206, 206, 207, 208, 208, 209, 209, 210, 211, 211, 212, 212, 213, 214, 214, 215, 215, 216, 217, 217, 218, 218, 219, 219, 220, 221, 221, 222, 222, 223, 224, 224, 225, 225, 226, 226, 227, 227, 228, 229, 229, 230, 230, 231, 231, 232, 232, 233, 234, 234, 235, 235, 236, 236, 237, 237, 238, 238, 239, 240, 240, 241, 241, 242, 242, 243, 243, 244, 244, 245, 245, 246, 246, 247, 247, 248, 248, 249, 249, 250, 250, 251, 251, 252, 252, 253, 253, 254, 254, 255)
 
@@ -2327,46 +2213,32 @@ class DivSufSort : ISuffixArrayBuilder {
             return if (0 <= a) a else a.inv()
         }
 
-        private fun min(a: Int, b: Int): Int {
-            return if (a < b) a else b
-        }
-
 
         /**
          *
          */
-        private fun ssIsqrt(x: Int): Int {
-            var y: Int
-            val e: Int
-
-            if (x >= SS_BLOCKSIZE * SS_BLOCKSIZE) {
-                return SS_BLOCKSIZE
-            }
-            e = if (x and -0x10000 != 0)
-                if (x and -0x1000000 != 0)
-                    24 + lg_table[x shr 24 and 0xff]
-                else
-                    16 + lg_table[x shr 16 and 0xff]
-            else
-                if (x and 0x0000ff00 != 0)
-                    8 + lg_table[x shr 8 and 0xff]
-                else
-                    0 + lg_table[x shr 0 and 0xff]
-
-            if (e >= 16) {
-                y = sqq_table[x shr e - 6 - (e and 1)] shl (e shr 1) - 7
-                if (e >= 24) {
-                    y = y + 1 + x / y shr 1
+        private fun ssIsqrt(x: Int): Int =when {
+                x and -0x10000 != 0 -> when {
+                    x and -0x1000000 != 0 -> 24 + lg_table[x shr 24 and 0xff]
+                    else -> 16 + lg_table[x shr 16 and 0xff]
                 }
-                y = y + 1 + x / y shr 1
-            } else if (e >= 8) {
-                y = (sqq_table[x shr e - 6 - (e and 1)] shr 7 - (e shr 1)) + 1
-            } else {
-                return sqq_table[x] shr 4
-            }
+                x and 0x0000ff00 != 0 -> 8 + lg_table[x shr 8 and 0xff]
+                else -> 0 + lg_table[x shr 0 and 0xff]
+            }.let {e->
 
-            return if (x < y * y) y - 1 else y
-        }
+                if (x < SS_BLOCKSIZE * SS_BLOCKSIZE) {
+                    var y: Int
+
+                    if (e >= 16) {
+                        y = sqq_table[x shr e - 6 - (e and 1)] shl (e shr 1) - 7
+                        if (e >= 24) y = y + 1 + x / y shr 1
+                        y = y + 1 + x / y shr 1
+                    } else if (e >= 8) y = (sqq_table[x shr e - 6 - (e and 1)] shr 7 - (e shr 1)) + 1 else return@let sqq_table[x] shr 4
+
+                    return@let if (x < y * y) y - 1 else y
+                }
+                 SS_BLOCKSIZE
+            }
 
         /**
          *
@@ -2396,10 +2268,338 @@ class DivSufSort : ISuffixArrayBuilder {
         }
     }
 
-    fun IntArray.swap(f: Int, s: Int) = apply {
-        this[f] = this[f] xor this[s]
-        this[s] = this[s] xor this[f]
-        this[f] = this[f] xor this[s]
+    private fun IntArray.swap(f: Int, s: Int) = apply {
+        val t = this[s]
+        this[s] = this[f]
+        this[f] = t
+    }
+
+    init {
+        BUCKET_A_SIZE = ALPHABET_SIZE
+        BUCKET_B_SIZE = ALPHABET_SIZE * ALPHABET_SIZE
+    }
+
+
+}
+
+/**
+ * Holder for minimum and maximum.
+ *
+ * @see Tools.minmax
+ */
+class MinMax(val min: Int, val max: Int) {
+
+    fun range(): Int {
+        return max - min
+    }
+}
+
+/**
+ * Calculate minimum and maximum value for a slice of an array.
+ */
+fun minmax(input: IntArray, start: Int, length: Int): MinMax {
+    var max = input[start]
+    var min = max
+    var i = length - 2
+    var index = start + 1
+    while (i >= 0) {
+        val v = input[index]
+        if (v > max) {
+            max = v
+        }
+        if (v < min) {
+            min = v
+        }
+        i--
+        index++
+    }
+
+    return MinMax(min, max)
+}
+
+/**
+ * In the "dense" scenario we keep "forward" mapping between original keys (shifted to
+ * positive indexes) and their new key values. A "reverse" mapping is used to restore
+ * original values in place of the mapped keys upon exit.
+ */
+internal class DensePositiveMapper/*
+     *
+     */
+(input: IntArray, start: Int, length: Int) : ISymbolMapper {
+    private val offset: Int
+    private val forward: IntArray
+    private val backward: IntArray
+
+    init {
+        val minmax = minmax(input, start, length)
+        val min = minmax.min
+        val max = minmax.max
+
+        val forward = IntArray(max - min + 1)
+        val offset = -min
+
+        // Mark all symbols present in the alphabet.
+        val end = start + length
+        for (i in start until end) {
+            forward[input[i] + offset] = 1
+        }
+
+        // Collect present symbols, assign unique codes.
+        var k = 1
+        for (i in forward.indices) {
+            if (forward[i] != 0) {
+                forward[i] = k++
+            }
+        }
+
+        val backward = IntArray(k)
+        for (i in start until end) {
+            val v = forward[input[i] + offset]
+            backward[v] = input[i]
+        }
+
+        this.offset = offset
+        this.forward = forward
+        this.backward = backward
+    }
+
+    /*
+     *
+     */
+    override fun map(input: IntArray, start: Int, length: Int) {
+        var i = start
+        var l = length
+        while (l > 0) {
+            input[i] = forward[input[i] + offset]
+            l--
+            i++
+        }
+    }
+
+    /*
+     *
+     */
+    override fun undo(input: IntArray, start: Int, length: Int) {
+        var i = start
+        var l = length
+        while (l > 0) {
+            input[i] = backward[input[i]]
+            l--
+            i++
+        }
+    }
+}
+
+/**
+ * A holder structure for a suffix array and longest common prefix array of
+ * a given sequence.
+ */
+class SuffixData internal constructor(val suffixArray: IntArray, val lcp: IntArray)
+
+/**
+ * A decorator around [ISuffixArrayBuilder] that accepts any input symbols and maps
+ * it to non-negative, compact (dense) alphabet. Relative symbols order is preserved (changes are
+ * limited to a constant shift and compaction of symbols). The input is remapped in-place,
+ * but additional space is required for the mapping.
+ */
+class DensePositiveDecorator/*
+     *
+     */
+(private val delegate: ISuffixArrayBuilder) : ISuffixArrayBuilder {
+
+    /*
+     *
+     */
+    override fun buildSuffixArray(input: IntArray, start: Int, length: Int): IntArray {
+        val minmax = minmax(input, start, length)
+
+        val mapper: ISymbolMapper
+        if (minmax.range() > 0x10000) {
+            throw RuntimeException("Large symbol space not implemented yet.")
+        } else {
+            mapper = DensePositiveMapper(input, start, length)
+        }
+
+        mapper.map(input, start, length)
+        try {
+            return delegate.buildSuffixArray(input, start, length)
+        } finally {
+            mapper.undo(input, start, length)
+        }
+    }
+}
+
+/**
+ * A decorator around [ISuffixArrayBuilder] that:
+ *
+ *  * provides extra space after the input for end-of-string markers
+ *  * shifts the input to zero-based positions.
+ *
+ */
+class ExtraTrailingCellsDecorator
+/**
+ * @see SuffixArrays.MAX_EXTRA_TRAILING_SPACE
+ */
+(private val delegate: ISuffixArrayBuilder, private val extraCells: Int) : ISuffixArrayBuilder {
+
+    /*
+     *
+     */
+    override fun buildSuffixArray(input: IntArray, start: Int, length: Int): IntArray {
+        if (start == 0 && start + length + extraCells < input.size) {
+            return delegate.buildSuffixArray(input, start, length)
+        }
+
+        val shifted = IntArray(input.size + extraCells)
+
+        arraycopy(input, start, shifted, 0, length)
+
+        return delegate.buildSuffixArray(shifted, 0, length)
     }
 
 }
+
+//fun arraycopy(src,srcPos,dest,destPos,length: Int)=
+/* * @param destination the array to copy to.
+ * @param destinationOffset the position in the [destination] array to copy to, 0 by default.
+ * @param startIndex the beginning (inclusive) of the subrange to copy, 0 by default.
+ * @param endIndex the end (exclusive) of the subrange to copy, size of this array by default.
+*/
+//        input.copyInto(destination = shifted,startIndex = start,endIndex = length+start,destinationOffset = 0)
+
+/*src - Source array (Object type)
+
+srcPos - Starting position in Source array (Integer type)
+
+dest - Destination array (Object Type)
+
+destpos - Starting position in destination array (Integer type)
+
+length - Number of elements to be copied (Integer type)*/
+/*System.*/
+
+fun arraycopy(src: IntArray, srcPos: Int, dest: IntArray, destPos: Int, length: Int) {
+    src.copyInto(destination = dest, startIndex = srcPos, endIndex = length + srcPos, destinationOffset = destPos)
+
+
+}
+
+/**
+ *
+ *
+ * Factory-like methods for constructing suffix arrays for various data types. Whenever
+ * defaults are provided, they aim to be sensible, "best guess" values for the given data
+ * type.
+ *
+ *
+ * Note the following important aspects that apply to nearly all methods in this class:
+ *
+ *  * In nearly all cases, the returned suffix array will not be length-equal to the
+ * input sequence (will be slightly larger). It is so because most algorithms use extra
+ * space for end of sequence delimiters and it makes little sense to temporary duplicate
+ * memory consumption just to have exact length counts.
+ *
+ */
+object SuffixArrays {
+    /**
+     * Maximum required trailing space in the input array (certain algorithms need it).
+     */
+    val MAX_EXTRA_TRAILING_SPACE = 575// DeepShallow.OVERSHOOT
+
+    /**
+     * Create a suffix array for a given character sequence, using the provided suffix
+     * array building strategy.
+     */
+
+
+    fun create(s: CharSequence, builder: ISuffixArrayBuilder = defaultAlgorithm()): IntArray {
+        return CharSequenceAdapter(builder).buildSuffixArray(s)
+    }
+
+    /**
+     * Create a suffix array and an LCP array for a given character sequence, use the
+     * given algorithm for building the suffix array.
+     *
+     * @see .computeLCP
+     */
+
+    fun createWithLCP(s: CharSequence, builder: ISuffixArrayBuilder = defaultAlgorithm()): SuffixData {
+        val adapter = CharSequenceAdapter(builder)
+        val sa = adapter.buildSuffixArray(s)
+        val lcp = computeLCP(adapter.input, 0, s.length, sa)
+        return SuffixData(sa, lcp)
+    }
+
+    /**
+     * Create a suffix array and an LCP array for a given input sequence of symbols.
+     */
+    fun createWithLCP(input: IntArray, start: Int, length: Int): SuffixData {
+        val builder = DensePositiveDecorator(
+                ExtraTrailingCellsDecorator(defaultAlgorithm(), 3))
+        return createWithLCP(input, start, length, builder)
+    }
+
+    /**
+     * Create a suffix array and an LCP array for a given input sequence of symbols and a
+     * custom suffix array building strategy.
+     */
+    fun createWithLCP(input: IntArray, start: Int, length: Int,
+                      builder: ISuffixArrayBuilder): SuffixData {
+        val sa = builder.buildSuffixArray(input, start, length)
+        val lcp = computeLCP(input, start, length, sa)
+        return SuffixData(sa, lcp)
+    }
+
+    /**
+     * Calculate longest prefix (LCP) array for an existing suffix array and input. Index
+     * `i` of the returned array indicates the length of the common prefix
+     * between suffix `i` and `i-1`. The 0-th
+     * index has a constant value of `-1`.
+     *
+     *
+     * The algorithm used to compute the LCP comes from
+     * <tt>T. Kasai, G. Lee, H. Arimura, S. Arikawa, and K. Park. Linear-time longest-common-prefix
+     * computation in suffix arrays and its applications. In Proc. 12th Symposium on Combinatorial
+     * Pattern Matching (CPM ’01), pages 181–192. Springer-Verlag LNCS n. 2089, 2001.</tt>
+    `` */
+    fun computeLCP(input: IntArray, start: Int, length: Int,
+                   sa: IntArray): IntArray {
+        val rank = IntArray(length)
+        for (i in 0 until length)
+            rank[sa[i]] = i
+        var h = 0
+        val lcp = IntArray(length)
+        for (i in 0 until length) {
+            val k = rank[i]
+            if (k == 0) {
+                lcp[k] = -1
+            } else {
+                val j = sa[k - 1]
+                while (i + h < length && j + h < length
+                        && input[start + i + h] == input[start + j + h]) {
+                    h++
+                }
+                lcp[k] = h
+            }
+            if (h > 0) h--
+        }
+
+        return lcp
+    }
+
+    /**
+     * @return Return a new instance of the default algorithm for use in other methods. At
+     * the moment [QSufSort] is used.
+     */
+    private fun defaultAlgorithm(): ISuffixArrayBuilder {
+        return DivSufSort()
+    }
+
+    /**
+     * Utility method converting all suffixes of a given sequence to a list of strings.
+     */
+    fun toString(input: CharSequence, suffixes: IntArray): List<CharSequence> =
+            (0 until input.length).map { input.toString().subSequence(suffixes[it], input.toString().length) }
+}
+
+
