@@ -16,3 +16,12 @@ instructions and instruction effects signalled by negative energy along the same
 angular surface(s) that change the properties and manifestation of state along consistent proportional vectors to 
 original imperative code.
 
+# sample usecases
+
+## binary encoding
+
+simplest possible encoding an xy-plot to binary.
+
+find repeating coefficients which can express data losslessly as DCT-like curves
+
+![image](https://user-images.githubusercontent.com/73514/57193440-313d6d00-6f65-11e9-8250-b0f77d75b8cd.png)
