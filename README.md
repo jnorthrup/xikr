@@ -25,3 +25,8 @@ simplest possible encoding an xy-plot to binary.
 find repeating coefficients which can express data losslessly as DCT-like curves
 
 ![image](https://user-images.githubusercontent.com/73514/57193440-313d6d00-6f65-11e9-8250-b0f77d75b8cd.png)
+
+
+## reducto absurdome 
+
+start with ECG and audio waveform data to find textual language idioms
