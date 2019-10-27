@@ -1,8 +1,5 @@
 package com.fnreport
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.asFlow
-
 /**confix*/
 operator fun String.div(re: String) = this[0] + re + this[1]
 
@@ -94,27 +91,27 @@ confidence : #"[0]?\.[0]*[1-9]{1}[0-9]*"             (* 0 <  x <  1 *)
 
 
 class opt(
-    var emitter: RegexEmitter,
-    override val name: String = "opt" + ("()" / emitter.name),
-    override val regex: Regex = Regex(("()" / emitter.regex.pattern) + "?"),
-    override val symbol: String= ("()"/emitter.symbol)+"?"
+        var emitter: RegexEmitter,
+        override val name: String = "opt" + ("()" / emitter.name),
+        override val regex: Regex = Regex(("()" / emitter.regex.pattern) + "?"),
+        override val symbol: String = ("()" / emitter.symbol) + "?"
 ) : RegexEmitter
 
 enum class accounting(override val symbol: String, vararg decoders: Any) : RegexEmitter {
     /** same format, different interpretations */
     desire(
-        "%%" / ("(" + fragment.frequency + ")(;" + fragment.confidence + ")?"),
-        opt(fragment.frequency),
-        opt(fragment.confidence)
+            "%%" / ("(" + fragment.frequency + ")(;" + fragment.confidence + ")?"),
+            opt(fragment.frequency),
+            opt(fragment.confidence)
     ),
     /** two numbers in [0,1]x(0,1) */
     truth(desire.symbol, opt(fragment.frequency), opt(fragment.confidence)),
     /** three numbers in [0,1]x(0,1)x[0,1] */
     budget(
-        "$$" / (fragment.priority.regex.pattern + "(;" + fragment.durability + ")?(;" + fragment.quality + ")?"),
-        fragment.priority,
-        opt(fragment.durability),
-        opt(fragment.quality)
+            "$$" / (fragment.priority.regex.pattern + "(;" + fragment.durability + ")?(;" + fragment.quality + ")?"),
+            fragment.priority,
+            opt(fragment.durability),
+            opt(fragment.quality)
     );
 }
 
@@ -148,6 +145,7 @@ enum class fragment(override val symbol: String) : RegexEmitter {
 
 interface Emitter {
     val name: String
+
 }
 
 interface RegexEmitter : Emitter {
@@ -156,7 +154,10 @@ interface RegexEmitter : Emitter {
         get() = symbol
     val regex: Regex
         get() = symbol.toRegex()
+
+    fun RegexEmitter.test(input: String) = regex.find(input)
 }
+
 
 interface opaqueRegex : RegexEmitter {
     override val regex: Regex
@@ -169,12 +170,6 @@ interface setOp : opaqueRegex {
 
 }
 
-fun RegexEmitter.test(input: String): Pair<Emitter, MatchGroupCollection>? {
-    return regex.find(input)?.let {
-        val second: MatchGroupCollection = it.groups
-        Pair(this, second)
-    } ?: null
-}
 
 enum class copula(override val symbol: String, override val rep: String) : opaqueRegex {
     /*** inheritance*/
@@ -254,34 +249,17 @@ enum class tense(override val symbol: String, override val rep: String = symbol)
 }
 
 
-/**
-sentence ::= statement"." [tense] [truth]            (* judgement to be absorbed into beliefs *)
-| statement"?" [tense] [truth]            (* question on thuth-value to be answered *)
-| statement"!" [desire]                   (* goal to be realized by operations *)
-| statement"@" [desire]                   (* question on desire-value to be answered *)
- */
-class sentenceParser {
-    fun foo(): Flow<Int> = (1..3).asFlow()
-
-    fun scan(line: String) {
-        kotlinx.coroutines.channels.Channel<Sentence>()
-        kotlinx.coroutines.channels.Channel<Sentence>()
-        kotlinx.coroutines.channels.Channel<Sentence>()
-        kotlinx.coroutines.channels.Channel<Sentence>()
-    }
-}
-
 class oneOf(vararg val testFor: RegexEmitter) : RegexEmitter {
     override val symbol = testFor.map { it.symbol }.joinToString(separator = "|")
     override val regex =
-        testFor.map { it.regex.pattern }.joinToString(separator = "|", prefix = "(", postfix = ")").toRegex()
+            testFor.map { it.regex.pattern }.joinToString(separator = "|", prefix = "(", postfix = ")").toRegex()
     override val name: String = testFor.map(Emitter::name).joinToString("|")
 }
 
 open class Sentence(
-    override val name: String,
-    override val symbol: String,
-    vararg val after: RegexEmitter
+        override val name: String,
+        override val symbol: String,
+        vararg val after: RegexEmitter
 ) : RegexEmitter {
     override val rep: String
         get() = symbol
@@ -289,8 +267,22 @@ open class Sentence(
         get() = Regex("([^\\" + symbol + "])+\\" + symbol)
 }
 
-val Judgement = Sentence("Judgement", ".", opt(oneOf(*tense.values())), opt(accounting.truth))
-val Valuation = Sentence("Valuation","?", opt(oneOf( *tense.values())), opt(accounting.truth))
-val Goal =      Sentence("Goal", "!", opt(accounting.desire))
-val Interest = object:Sentence("Interest", "@", opt(accounting.desire)) { override val rep = "¿" }
 
+/**
+sentence ::= statement"." [tense] [truth]            (* judgement to be absorbed into beliefs *)
+| statement"?" [tense] [truth]            (* question on thuth-value to be answered *)
+| statement"!" [desire]                   (* goal to be realized by operations *)
+| statement"@" [desire]                   (* question on desire-value to be answered *)
+ */
+
+
+object Judgement : Sentence("Judgement", ".", opt(oneOf(*tense.values())), opt(accounting.truth))
+object Valuation : Sentence("Valuation", "?", opt(oneOf(*tense.values())), opt(accounting.truth))
+object Goal : Sentence("Goal", "!", opt(accounting.desire))
+object Interest : Sentence("Interest", "@", opt(accounting.desire)) {
+    override val rep get ()="¿"
+}
+
+fun main(args:Array<String>) {
+print("World*Hello")
+}
